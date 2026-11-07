@@ -1,0 +1,61 @@
+---
+- name: Install application runtime
+  ansible.builtin.apt:
+    name: python3
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create application user
+  ansible.builtin.user:
+    name: healthapp
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Create application directory
+  ansible.builtin.file:
+    path: /opt/health-app
+    state: directory
+    owner: healthapp
+    group: healthapp
+    mode: "0755"
+
+- name: Unpack application release
+  ansible.builtin.unarchive:
+    src: /workspace/app/health-app.tar.gz
+    dest: /opt/health-app
+    owner: healthapp
+    group: healthapp
+    remote_src: false
+
+- name: Install application environment
+  ansible.builtin.template:
+    src: health-app.env.j2
+    dest: /etc/health-app.env
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install application launcher
+  ansible.builtin.copy:
+    src: /workspace/app/src/start.sh
+    dest: /opt/health-app/start.sh
+    owner: healthapp
+    group: healthapp
+    mode: "0755"
+
+- name: Validate application files
+  ansible.builtin.command: python3 -m py_compile /opt/health-app/app.py
+  changed_when: false
+
+- name: Stop previous application process
+  ansible.builtin.shell: |
+    if [ -f /run/health-app.pid ]; then
+      kill "$(cat /run/health-app.pid)" 2>/dev/null || true
+    fi
+
+- name: Start application with shell launcher
+  ansible.builtin.shell: /opt/health-app/start.sh
+  environment:
+    APP_ENV_FILE: /etc/health-app.env

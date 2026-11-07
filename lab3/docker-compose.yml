@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  ansible-master:
+    build:
+      context: .
+      dockerfile: master/Dockerfile
+    volumes:
+      - ./ansible:/workspace/ansible:ro
+      - ./app:/workspace/app
+      - ./run-ansible.sh:/workspace/run-ansible.sh:ro
+    depends_on:
+      nginx-target:
+        condition: service_healthy
+      app-target:
+        condition: service_healthy
+    networks:
+      - labnet
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/deployment-complete"]
+      interval: 3s
+      timeout: 2s
+      retries: 60
+    command: ["/bin/sh", "/workspace/run-ansible.sh"]
+
+  nginx-target:
+    build:
+      context: target
+      dockerfile: Dockerfile
+    hostname: nginx-target
+    environment:
+      CONTAINER_ROLE: nginx
+    ports:
+      - "8080:80"
+    networks:
+      - labnet
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  app-target:
+    build:
+      context: target
+      dockerfile: Dockerfile
+    hostname: app-target
+    environment:
+      CONTAINER_ROLE: app
+    networks:
+      - labnet
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: labdb
+      POSTGRES_USER: labuser
+      POSTGRES_PASSWORD: labpassword
+    networks:
+      - labnet
+
+networks:
+  labnet:
