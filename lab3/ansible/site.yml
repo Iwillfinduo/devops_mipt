@@ -1,0 +1,23 @@
+---
+- name: Bootstrap Python on clean targets
+  hosts: all
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Install Python for Ansible modules
+      ansible.builtin.raw: |
+        apt-get update
+        apt-get install -y --no-install-recommends python3
+        rm -rf /var/lib/apt/lists/*
+
+- name: Install and configure Nginx
+  hosts: nginx
+  become: true
+  roles:
+    - nginx
+
+- name: Deploy application
+  hosts: app
+  become: true
+  roles:
+    - app
